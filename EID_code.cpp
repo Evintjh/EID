@@ -1,41 +1,33 @@
-//capacitive touch sensor, must download the ADAfruit library
-
-#include <Wire.h>
-#include "Adafruit_MPR121.h"
-
-#ifndef _BV
-#define _BV(bit) (1 << (bit))
-#endif
-
-Adafruit_MPR121 cap = Adafruit_MPR121(;)
-
-int16_t lasttouched = 0;
-int16_t currtouched = 0;            //keep track of last pins touched
-
-
-//FSR
+//Force Sensor
 #define sensorPin A0
 int x = 0;
 
+//Using Force Sensor2 as a capacitance sensor
+#define sensorPin1 A1
+int capacitance = 0;
+
 
 //Stepper motor
-#include <Stepper.h>
-
-const int stepsPerRevolution = 2038;        //Defines the no.of steps per rotation, can try decreasing the steps to make it faster? or see the diff
-
-Stepper myStepper = Stepper(stepsPerRevolution, 8, 9, 10, 11);
-float turn_ratio = 0;
+const int stepPin = 7; 
+const int dirPin = 6; 
+const int enPin = 5;
 
 
 //LED lights
-int redlight = 8;
-int yellow_light = 9;
+int redlight = 12;
+int greenlight = 13;
 
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
 
+    //Motor speed
+    pinMode(stepPin,OUTPUT); 
+    pinMode(dirPin,OUTPUT);
+    pinMode(enPin,OUTPUT);
+    digitalWrite(enPin,LOW);
 
+    /*
     //MPR121 setup
     while (!Serial) {
         delay(10);
@@ -49,55 +41,115 @@ void setup() {
     }
 
     Serial.println("MPR121 found");
+    */
 
 
     //LEDs setup
     pinMode(redlight, OUTPUT);
-    pinMode(yellow_light, OUTPUT);
+    pinMode(greenlight, OUTPUT);
 
 }
 
 
+void brake(){                                 //turn ratio is out of stepsPerRevolution
+  digitalWrite(dirPin,HIGH);
+  for(int y = 0; y < 300; y++) {                  //x is the control
+      //Serial.println(y);
+      digitalWrite(stepPin,HIGH); 
+      delayMicroseconds(1000); 
+      digitalWrite(stepPin,LOW); 
+      delayMicroseconds(1000); 
+    }
+    //delay(1000); // One second delay
+    //digitalWrite(dirPin,LOW); //Changes the direction of rotation
+    /*
+    for(int x = 0; x < 800; x++) {
+      digitalWrite(stepPin,HIGH);
+      delayMicroseconds(500);
+      digitalWrite(stepPin,LOW);
+      delayMicroseconds(500);
+    }
+    delay(1000); 
+}
+*/
+}
 
-void loop()
+
+void unbrake(){
+  digitalWrite(dirPin,LOW); //Changes the direction of rotation
+    
+    for(int y = 0; y < 100; y++) {
+      //Serial.println(y);
+      digitalWrite(stepPin,HIGH);
+      delayMicroseconds(1000);
+      digitalWrite(stepPin,LOW);
+      delayMicroseconds(1000);
+    }
+   // delay(1000); 
+}
+
+
+
+void loop(){
 
     //touch sensor input
     //currtouched = cap.touched();
     
     //FSR input
     x = analogRead(sensorPin);
+    //x1 = analogRead(sensorPin1);
     Serial.println(x);
 
-    while (x>...){
-        if (cap.touched()){
-            brake_arm(0.25);
-            digitalWrite(yellow_light, HIGH);
+    int z = 0;
+
+    while (x>50){
+        capacitance = analogRead(sensorPin1);
+        
+        if (capacitance>100 && z==0){
+        //if (cap.touched()){
+            Serial.println("brake released");
+            unbrake();
+            digitalWrite(greenlight, HIGH);
+            digitalWrite(redlight, LOW);
+            delay(2000);  
+            z=z+1;
+            
+
         }
 
-        else if (!cap.touched())
-            break;
-    }
+        else if (capacitance<100){
+          Serial.println("user still holding");
+          break;
+        }
 
-    else{
-        brake_arm(-0.25);
-        while (True){
-            digitalWrite(redlight, HIGH);
-            if (x>...)break;
+        else{
+          z=z+1;
         }
     }
 
+    if (x<50){
+        Serial.println("Engaging brakes");
+        brake();
+        //z = z+1;
+        Serial.println("Braked");
+        digitalWrite(redlight, HIGH);
+        digitalWrite(greenlight, LOW);
+        Serial.println("Safe");
+        delay(2000);
+        
+        while(true){  
+            x = analogRead(sensorPin); 
+            Serial.println(x);   
+            if (x>100){
+              Serial.println("User has returned");
+              break;
+            }
+        }
+        
 
-    
-
-
-
-void brake_arm(turn_ratio)
-    myStepper.setspeed(5);             //try different speeds see if it affects torque
-    myStepper.step(turn_ratio*stepsPerRevolution);
-
-
-
-
-
-    
-
+        /*
+        x = analogRead(sensorPin);
+        if (x>100)Serial.println("User has returned");
+        */
+    }
+}
